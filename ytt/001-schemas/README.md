@@ -5,30 +5,30 @@
 
 [![hackmd-github-sync-badge](https://hackmd.io/pODV3wzbT56MbQTxbQOOKQ/badge)](https://hackmd.io/pODV3wzbT56MbQTxbQOOKQ)
 
-## Table of Contents
+# Table of Contents
 
 [TOC]
 
 ---
 
-## Problem Statement
+# Problem Statement
 
 Configuration Authors want to be able to document, constrain, and generate configuration inputs (for example, Data Values) for _their_ users.
 
 Specifically, they would like to:
 - **have a single authoritative definition of possible inputs** (think: API) _to simplify the task of discovering the total set of possible inputs_;
 - be able to **attach documentation to those definitions** in a format that tools could extract _to communicate meaning and intent of each input_;
-- **provide structure, type, and value validations** to inputs _so that errors can be detected quickly and reported in terms the user will likely understand_.
+- **provide structure/type checks and value validations** to inputs _so that errors can be detected quickly and reported in terms the user will likely understand_.
 
-As of v0.26.0, `ytt` technical has a feature set that could satisfy all of these requirements. However, doing so is onerous and error prone. Also, many of the error messages that `ytt` emits today around these topics have been found by many users to be enigmatic.
+As of v0.26.0, `ytt` technically has a feature set that could satisfy all of these requirements. However, doing so is onerous and error prone. Also, many of the error messages that `ytt` emits today around these topics have been found by many users to be enigmatic.
 
 Likewise, there exist tools that can meet some of these requirements. However, given the need to weave in many of these behaviors to the structure building algorithm that is `ytt`'s main flow, they fall short of meeting the first-order needs and do nothing to improve the user experience around specifying data values.
 
 As an opportunistic driver, Configuration Authors who wrestle with non-trivial templatizing and patching of configuration would appreciate the ability to validate the resulting documents, helping ensure that their `ytt` library yields well-formed and valid YAML docs.
 
-## Proposal
+# Proposal
 
-Implement a light-weight typing system for YAML documents: `ytt` Schema.
+Implement a light-weight [type system](https://en.wikipedia.org/wiki/Type_system) for YAML documents: `ytt` Schema.
 
 Focus first on addressing the needs around Data Values documents: making it easy to declare and activate a schema for this input.
 
@@ -45,7 +45,7 @@ This mechanism ought to:
 
 Keep in mind that we aim for being able to articulate schema for any YAML document `ytt` handles. e.g. [ytt#103@schema-for-templates](https://github.com/k14s/ytt/issues/103#issuecomment-624326922)
 
-### Sources of Inspiration
+## Sources of Inspiration
 
 Be aware of prior art: avoid reinvention; shamelessly "repurpose" great ideas.
 
@@ -57,18 +57,29 @@ Remember the differences in context:
 - we seek simplicity, brevity, and readability.
 
 
-## Specification
+# Specification
 
-### Examples
+## Terms
 
-- Using [cf-for-k8's data values](cf-for-k8s/values.yml) as an example, this is what the schema would look like in various formats:
-  - [JSON schema (as json)](cf-for-k8s/json-schema.json)
-  - [JSON schema (as yaml)](cf-for-k8s/json-schema.yml)
+- **schema** :: a definition of the types and validation rules for a given YAML structure (i.e. Document, Array, Map, etc.).
+- **type** :: a specific shape for a given node.
+- **type checking** :: (v.) comparing the shape of a YAML structure against its schema's types.
+- **type check** :: (n.) the result of type checking
+- **validating** :: (v.) determining whether the values contained in a YAML structure are acceptable.
+- **validation** :: (n.) the result of validating
+- **validation rule** :: predicate that indicates whether a given (sub-)structure is valid or not.
+- **violation** :: an instance of either a failed type check or a failed validation.
+
+## Examples
+
+- Using [cf-for-k8's data values](cf-for-k8s/values.yml) as an example, this is what the schema would look like:
   - [ytt native schema](cf-for-k8s/ytt-schema.yml)
-
+  - for comparison/illustration, this is the same structure expressed in JSON Schema:
+    - [JSON schema (as json)](cf-for-k8s/json-schema.json)
+    - [JSON schema (as yaml)](cf-for-k8s/json-schema.yml)
 - [Dex](example-partial-dex.yaml)
 
-### Defining a schema document
+## Defining a schema document
 
 ```yaml
 #@schema/match data_values=True
@@ -78,7 +89,7 @@ Remember the differences in context:
 
 The `#@schema/match` annotation will create a new schema document. The `data_values=True` will apply to all `@data/values`.
 
-### The Type System
+## The Type System
 
 Schemas will have a built-in type system similar to Golang's. This decision was made to ensure that when a key is in the schema, its value will be safe to use. In most cases, the type will be inferred from the value itself without the need for explicit annotation. However, when more control is needed, the `@schema/type` annotation is available.
 
@@ -97,14 +108,12 @@ Following types are available:
 
 Tentative: use `any` when wanting to say "all types"
 
-TBD: use starlark or yaml terminology (list vs array, map vs dict)?
 
+## Schema annotations
 
-### Schema annotations
+### Value type annotations
 
-#### Value type annotations
-
-##### `@schema/type string, [...string,] [or_inferred=True]`
+#### `@schema/type string, [...string,] [or_inferred=True]`
 
   This annotation is used to specify the data type of a value (by listing allowed types) when type inference is not sufficient. For example, when multiple types are allowed:
 
@@ -119,7 +128,7 @@ percentage: 0
   
   `or_inferred=True` can be used iff the value is `map-typed <unique>` or `array-typed <unique>`.
 
-##### `@schema/default value`
+#### `@schema/default value`
 
   This annotation is used to specify default value. It's not necessary in most cases since value provided is used as a default; however, for arrays or multi-type values it's typically necessary to avoid ambiguity.
 
@@ -145,7 +154,7 @@ percentage: 0
       
   `@schema/default` is _required_ for `array-typed <unique>` values to indicate explicitly to readers of schema what is the default value.
 
-##### `@schema/nullable`
+#### `@schema/nullable`
 
   This annotation is used to specify that the type will be inferred from the value (similar to default behaviour for all declarations) given in the schema, _and_ it is allowed to be null.
 
@@ -175,11 +184,11 @@ cf_db:
   admin_password: ""
 ```
 
-#### Value validation annotations
+### Value validation annotations
 
 Beyond specifying a type for a value, one can specify more dynamic constraints on the value via validations.
 
-##### `@schema/validate [...user-provided-funcs,] [...builtin-kwargs]`
+#### `@schema/validate [...user-provided-funcs,] [...builtin-kwargs]`
 
   This annotation specifies how to validate value. `@schema/validate` will provide a set of keyword arguments which map to built-in validations, such as `max`, `max_len`, etc., but will also accept user-defined validation functions. Less common validators will also be provided via a `validations` library. For example,
 
@@ -227,9 +236,9 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
 
   String values, by default, have `@schema/validate min_len=1` validation added.
 
-#### Describing annotations
+### Describing annotations
 
-##### `@schema/title`
+#### `@schema/title`
 
   This annotation provides a way to add a short title to the section of a schema associated with a key, similar to the [JSON schema title field](https://json-schema.org/draft/2019-09/json-schema-validation.html#rfc.section.9.1).
 
@@ -240,7 +249,7 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
 
   If the annotation is not present, the title will be inferred from the key name by replacing special characters with spaces and capitalizing the first letter similar to [rails humanize functionality](https://apidock.com/rails/String/humanize).
 
-##### `@schema/doc`
+#### `@schema/doc`
 
   This annotation is a way to add a longer description to the section of a schema associated with a key, similar to the JSON Schema description field.
 
@@ -249,7 +258,7 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
   user_password: ""
   ```
 
-##### `@schema/example`
+#### `@schema/example`
 
   This annotation will take one argument that is an example of a value that satisfies the schema.
 
@@ -260,7 +269,7 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
 
   In this example, the example string "my_domain.example.com" will be attached to the `system_domain` key.
 
-##### `@schema/examples`
+#### `@schema/examples`
   This annotation will take one or more tuple arguments which consist of (Title, Example value).
 
   ```yaml
@@ -270,11 +279,11 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
 
   In this example, the `"Title 1"` and `"Title 2"` examples and their values are attached to the key `foo`.
 
-##### `@schema/deprecated`
+#### `@schema/deprecated`
 
   If the user provides a value, a warning that the field has been deprecated is outputted (stderr) to the user.
 
-##### `@schema/removed`
+#### `@schema/removed`
 
   If the user provides a value, an error is returned, and evaluation stops.
 
@@ -283,9 +292,9 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
    system_domain: ""
    ```
 
-#### Map key presence annotations
+### Map key presence annotations
 
-##### `@schema/any-key` (TBD: any other name for this?)
+#### `@schema/any-key` (TBD: any other name for this?)
 
   Applies to multiple KVs of a map that were not matched by explicitly specified keys, allowing users to assert on item structure while maintaining freedom to have any key name.
   ```yaml
@@ -297,7 +306,7 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
   ```
   This example requires items in the `connection_options` map to have value type array of strings.
 
-##### `@schema/key-may-be-present`
+#### `@schema/key-may-be-present`
 
   This annotation can be used to allow keys in the schema without providing a guarantee they will be present. This allows schemas to validate contents of a structure in cases where the contents are not referenced directly. For example,
   ```yaml
@@ -307,14 +316,14 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
   ```
   will allow the key `pooled` but will not guarantee its presence. This is useful when referencing the containing structure, such as #@ data.values.connection_options, in a template instead of the key directly: #@ data.values.connection_options.pooled. See more advanced examples below for more.
 
-### Sequence of events
+## Sequence of events
 
 1. Extract defaults from the provided schemas
 1. Apply data values
 1. Overlay with type checks
 1. Perform validations on the final document (if there's a validation failure, record the error, short circuit to sibling/parent, and continue validation)
 
-### Complex Examples
+## Complex Examples
 
 This snippet will result in an array with a single element, type `bucket`, with `versioning` defaulted to `Enabled`.
 
@@ -523,3 +532,7 @@ foo: #@ yaml.encode(data.values) #! => {},  {"foo": {"username": "val", "max_con
 - respect schema for data values set via cmd line flags/env vars
 - add --data-values-schema-inspect (similar to --data-values-inspect)
   - generate html view via builtin server
+
+# Additional References
+
+- 🔒 [Cloud Foundry for Kubernetes Configuration and Versioning Scheme](https://docs.google.com/document/d/1q4QyaElEX3KtIeGjwPmZpxsJpgsxin9sx7M0T4qBiW0)
