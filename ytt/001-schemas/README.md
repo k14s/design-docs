@@ -1,3 +1,6 @@
+---
+tags: schema
+---
 # Schemas
 
 - Status: Scoping | **Pre-Alpha** | In Alpha | In Beta | GA | Rejected
@@ -68,6 +71,7 @@ Remember the differences in context:
 - **validating** :: (v.) determining whether the values contained in a YAML structure are acceptable.
 - **validation** :: (n.) the result of validating
 - **validation rule** :: predicate that indicates whether a given (sub-)structure is valid or not.
+- **verifying** :: (v.) a short-hand way of saying, "type checking and validation."
 - **violation** :: an instance of either a failed type check or a failed validation.
 
 ## Examples
@@ -89,6 +93,7 @@ Remember the differences in context:
 
 The `#@schema/match` annotation will create a new schema document. The `data_values=True` will apply to all `@data/values`.
 
+If the schema document is in its own file, include it with `-f`; also be sure to enable the experimental schema features with the `--enable-experiment-schema` flag.
 ## The Type System
 
 Schemas will have a built-in type system similar to Golang's. This decision was made to ensure that when a key is in the schema, its value will be safe to use. In most cases, the type will be inferred from the value itself without the need for explicit annotation. However, when more control is needed, the `@schema/type` annotation is available.
@@ -224,7 +229,8 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
     - duration: Golang's duration e.g. "10h"
   - not_null=bool to verify value is not null
   - unique=bool to verify value contains unique elements (TBD?)
-  - prefix=string to verify string has prefix (TBD?)
+  - starts_with=string to verify string has prefix
+  - ends_with=string to verify string has suffix
   - TBD
 
   Full list of builtin validations included in a library:
@@ -315,13 +321,6 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
     pooled: true
   ```
   will allow the key `pooled` but will not guarantee its presence. This is useful when referencing the containing structure, such as #@ data.values.connection_options, in a template instead of the key directly: #@ data.values.connection_options.pooled. See more advanced examples below for more.
-
-## Sequence of events
-
-1. Extract defaults from the provided schemas
-1. Apply data values
-1. Overlay with type checks
-1. Perform validations on the final document (if there's a validation failure, record the error, short circuit to sibling/parent, and continue validation)
 
 ## Complex Examples
 
@@ -526,13 +525,235 @@ foo: #@ yaml.encode(data.values) #! => {},  {"foo": {"username": "val", "max_con
 ## Open Questions
 
 - Are there needs around versioning schema?
+- How will code defined in a schema file make its way into the execution context of the target "template"?
+  - e.g. function supporting validation
+  - idea: could we capture the "globals" resulting from the execution of the schema "template" and feed those into the target "template"'s execution context?
+  - there are expressions/statements to consume during the schema "template" construction... but other expression/statements that need to be made available to target "templates".
 - Should we support generating `ytt` Schema from other popular sources (e.g. JSON Schema, OpenAPI v3 schema)?
 - how to add more things to schema? (via overlays similar to data values)
 - provide programmatic schema.apply() (similar to overlay.apply)
 - respect schema for data values set via cmd line flags/env vars
 - add --data-values-schema-inspect (similar to --data-values-inspect)
   - generate html view via builtin server
+- with the addition of a schema, the first data values file no longer serves that role. Could we improve the UX of adding multiple data value files by not requiring subsequent data values to be overlays?
+- could a user include both a data/value + schema/amend in the same file?
+  - allowing a user to define and include input values in one file?
+- How do we support data values that are targetting a dependency library?
+
+# Design Notes
+
+## Some Early Candidate Principles/Decisions
+
+There are six core features:
+1. [Parsing](#Parsing) — from text file (in YAML format) to tree of yamlmeta.Node(s).
+2. [Compilation](#Compilation) — compiling YAML template into Starlark.
+4. [Typing](#Typing) — calculating "Type" for each yamlmeta.Node
+5. [Checking](#Type-Checking) — perform type check
+6. [Validating](#Validating) — execute validations
+7. [Documenting](#DocumentingSchema) — generate metadata suitable as input for templatized documentation.
+
+Observations/Guesses:
+- In effect, we're implementing a dynamic type checking so that we can perform a sort of "late binding" — attaching defaulting and validation behavior to individual nodes.
+- Parser _yields_ Nodes
+- Schema determines Node Type
+- Types _check_ Nodes
+
+
+### Parsing
+
+```graphviz
+digraph graphname {
+
+        yaml_parser [label="yaml Parser (v2)"]
+        yaml_node [label="yaml.v2 Node" color=blue fontcolor=blue]
+        ytt_yaml_node [label="yamlmeta.Node" color=purple fontcolor=purple]
+        ytt_parser [label="ytt 'Parser'"]
+        
+        yaml_parser -> yaml_node;
+		yaml_node -> ytt_parser;
+		ytt_parser -> ytt_yaml_node [label="«maps to»"];
+        
+	}
+```
+_([graphviz reference](https://www.tonyballantyne.com/graphs.html))_
+
+
+### Typing
+
+Involves:
+1. identifying the concrete type for a given node
+2. copy in default values where missing
+3. attach "machinery" required to support validation.
+
+Notes:
+- we do not check for violations while typing.
+- typing is made on "best-effort" basis
+- for Data Values, there ought to be one choice of structural types, and sparse choices of leaf values (e.g. `stringOrInt`)
+- for other Document Types, we _might_ want to support multiple possible types for a given node.
+- Schema maps from yamlmeta.Node(s) to yamlmeta.Node(s)
+
+
+```graphviz
+digraph graphname {
+        ytt_yaml_node [label="yamlmeta.Node" color=purple fontcolor=purple]
+        schema [label="Schema"]
+        type [label="Type"]
+
+        schema -> ytt_yaml_node [label="«finds type for»"]
+		ytt_yaml_node -> type [label="«has a»" color=gray];
+        schema -> type [label="«has list of allowed»"]
+	}
+```
+_([graphviz reference](https://www.tonyballantyne.com/graphs.html))_
+
+
+### Type-Checking
+
+```graphviz
+digraph graphname {
+        rankdir=LR
+
+        ytt_yaml_node [label="yamlmeta.Node" color=purple fontcolor=purple]
+                
+        
+		ytt_yaml_node -> Type [label="«has a»" color=gray fontcolor=gray];
+        
+        Value -> Type [label="«is checked against»"];
+        Type -> "Type Check" [label="«results in a»"];
+	}
+```
+_([graphviz reference](https://www.tonyballantyne.com/graphs.html))_
+
+
+### Validation
+
+
+### Schema Documentation
+
+
+#### Workflow Sketch
+
+:::warning
+Not how it _must_ be, but how it _could_ be.
+:::
+
+
+`schema.yml`
+```yaml=
+#@schema/title "User Name used to log into the database."
+username: ""
+
+#@schema/title "Full URL to the external database."
+#@schema/doc "Only used if `enable_external_db` is `true`"
+db_url: ""
+```
+
+`schema-docs.yml`
+```yaml=
+docs:
+  username:
+    title: User Name used to log into the database.
+  db_url:
+    title: Full URL to the external database.
+    doc: Only used if `enable_external_db` is `true`
+```
+
+`schema-docs.yml`
+```yaml=
+#@data/values
+---
+docs:
+  fields:
+  - name: "username"
+    title: User Name used to log into the database.
+  - name: "db_url"
+    title: Full URL to the external database.
+    doc: Only used if `enable_external_db` is `true`
+```
+
+`docs.html.txt`
+```htmlmixed=
+(@ load("@ytt:data", "data") @)
+
+<table>
+  <th><td>Field</td><td>Title</td><td>Description</td></th>
+  (@ for field in data.values.docs.fields: @)<tr><td>(@= field.name @)</td><td>(@= field.title@)</td></tr>
+  (@ end -@)
+</table>
+
+```
+
+```shell
+$ ytt schema docs -f schema.yml | ytt -f- -f docs.html.txt
+```
+
 
 # Additional References
 
 - 🔒 [Cloud Foundry for Kubernetes Configuration and Versioning Scheme](https://docs.google.com/document/d/1q4QyaElEX3KtIeGjwPmZpxsJpgsxin9sx7M0T4qBiW0)
+- Sorbet (a typing system in Ruby): https://sorbet.org/docs/type-assertions
+- Kubernetes users requesting JSON Schema: https://github.com/kubernetes/kubernetes/issues/14987
+
+# Sketching
+
+`schema.yaml`
+```yaml=
+
+#@schema/match data_values=True
+---
+#@schema/default []
+dns_servers:
+- hostname: ""
+  secure: false
+  map: 
+      a: ""
+```
+
+`values.yml`
+```yaml=
+---
+dns_servers: []
+```
+
+
+`overlay.yml`
+```yaml=
+#@overlay/match by=...
+---
+items:
+#@overlay/append       <== triggers Node typing
+- thing: one
+#@overlay/match by=overlay.all
+- other: true
+
+```
+
+
+`result.yml`
+```yaml=
+dns_servers:
+- hostname: ""
+  secure: false
+```
+
+`template.yml`
+```yaml=
+---
+#@ for server in data.values.dns_servers:
+dns: #@ "{}:{}".format(server.secure, server.hostname)
+server.map.a
+#@ end
+```
+
+
+`overlay.yml`
+```yaml=
+#@overlay/match by=...
+---
+items:
+#@overlay/append
+- thing: one
+  #@overlay/replace via=foo
+  other: 
+
+```
