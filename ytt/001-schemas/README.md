@@ -23,9 +23,9 @@ Specifically, they would like to:
 - be able to **attach documentation to those definitions** in a format that tools could extract _to communicate meaning and intent of each input_;
 - **provide structure/type checks and value validations** to inputs _so that errors can be detected quickly and reported in terms the user will likely understand_.
 
-As of v0.26.0, `ytt` technically has a feature set that could satisfy all of these requirements. However, doing so is onerous and error prone. Also, many of the error messages that `ytt` emits today around these topics have been found by many users to be enigmatic.
+As of v0.26.0, `ytt` technically has a feature set that could satisfy all of these requirements. However, doing so is onerous and error prone. Also, many of the error messages that `ytt` emits today around these topics have been found by many users to be enigmatic (if not frustrating).
 
-Likewise, there exist tools that can meet some of these requirements. However, given the need to weave in many of these behaviors to the structure building algorithm that is `ytt`'s main flow, they fall short of meeting the first-order needs and do nothing to improve the user experience around specifying data values.
+There exist tools that can meet some of these requirements. However, given the need to weave in many of these behaviors to the structure building algorithm that is `ytt`'s main flow, they fall short of meeting the first-order needs and do little to improve the user experience around specifying data values.
 
 As an opportunistic driver, Configuration Authors who wrestle with non-trivial templatizing and patching of configuration would appreciate the ability to validate the resulting documents, helping ensure that their `ytt` library yields well-formed and valid YAML docs.
 
@@ -39,8 +39,8 @@ This mechanism ought to:
 
 - provide a way to articulate a schema for Data Values;
   - declare YAML document contents: Map, Array, their contained items by example (i.e. by simply adding the nodes)
-- the schema must be YAML, itself _so that users can leverage all that they learn/know about this format and not have to context switch to read/consider/write this description_;
-- in fact, schema documents should enjoy all the features of data values files and templates _so that all of the attendant capabilities are available in this context as well_;
+- the schema must be YAML — itself — _so that users can leverage all that they learn/know about this format and not have to context switch to read/consider/write this description_;
+- schema documents should enjoy all the features of data values files and templates _so that all of the attendant capabilities are available in this context as well_;
   - be able to define functions to capture expressions that are evaluated at runtime
   - be able to attach metadata (i.e. annotations) to capture information _outside_ of the structure of the document
 - provide a means of attaching documentation to nodes;
@@ -76,11 +76,11 @@ Remember the differences in context:
 
 ## Examples
 
-- Using [cf-for-k8's data values](cf-for-k8s/values.yml) as an example, this is what the schema would look like:
-  - [ytt native schema](cf-for-k8s/ytt-schema.yml)
+- Using [cf-for-k8's data values](https://github.com/k14s/design-docs/blob/develop/ytt/001-schemas/cf-for-k8s/values.yml) as an example, this is what the schema would look like:
+  - [ytt native schema](https://github.com/k14s/design-docs/blob/develop/ytt/001-schemas/cf-for-k8s/ytt-schema.yml)
   - for comparison/illustration, this is the same structure expressed in JSON Schema:
-    - [JSON schema (as json)](cf-for-k8s/json-schema.json)
-    - [JSON schema (as yaml)](cf-for-k8s/json-schema.yml)
+    - [JSON schema (as json)](https://github.com/k14s/design-docs/blob/develop/ytt/001-schemas/cf-for-k8s/json-schema.json)
+    - [JSON schema (as yaml)](https://github.com/k14s/design-docs/blob/develop/ytt/001-schemas/cf-for-k8s/json-schema.yml)
 - [Dex](example-partial-dex.yaml)
 
 ## Defining a schema document
@@ -173,7 +173,7 @@ aws:
   It is equivalent for the following `@schema/type` and `@schema/default` declaration:
 
 ```yaml
-#@schema/type None, or_inferred=True
+#@schema/type "null", or_inferred=True
 #@schema/default None
 aws:
   username: ""
@@ -524,6 +524,8 @@ foo: #@ yaml.encode(data.values) #! => {},  {"foo": {"username": "val", "max_con
 
 ## Open Questions
 
+- How should schema work with ytt libraries?
+  - How do we support data values that are targetting a dependency library?
 - Are there needs around versioning schema?
 - How will code defined in a schema file make its way into the execution context of the target "template"?
   - e.g. function supporting validation
@@ -538,25 +540,30 @@ foo: #@ yaml.encode(data.values) #! => {},  {"foo": {"username": "val", "max_con
 - with the addition of a schema, the first data values file no longer serves that role. Could we improve the UX of adding multiple data value files by not requiring subsequent data values to be overlays?
 - could a user include both a data/value + schema/amend in the same file?
   - allowing a user to define and include input values in one file?
-- How do we support data values that are targetting a dependency library?
+
 
 # Design Notes
 
-## Some Early Candidate Principles/Decisions
+## Observations/Guesses
 
-There are six core features:
+_(Collection of "insights" that might bring cohesion to the overall design.)_
+
+- In effect, we're implementing a dynamic type checking so that we can perform a sort of "late binding" — attaching defaulting and validation behavior to individual nodes.
+  - [Node](https://github.com/k14s/ytt/blob/cbd0c3959/pkg/yamlmeta/ast.go#L10-L33)s contain "coarse-grain" type information (i.e. what kind of YAML node is it?);
+  - this proposal effectively extends that abstraction to include "fine-grain" type information
+- Parser _yields_ Nodes
+- Schema determines Node Type
+- Types _check_ Nodes
+
+## Core Features
+
+There are six core operations:
 1. [Parsing](#Parsing) — from text file (in YAML format) to tree of yamlmeta.Node(s).
 2. [Compilation](#Compilation) — compiling YAML template into Starlark.
 4. [Typing](#Typing) — calculating "Type" for each yamlmeta.Node
 5. [Checking](#Type-Checking) — perform type check
 6. [Validating](#Validating) — execute validations
 7. [Documenting](#DocumentingSchema) — generate metadata suitable as input for templatized documentation.
-
-Observations/Guesses:
-- In effect, we're implementing a dynamic type checking so that we can perform a sort of "late binding" — attaching defaulting and validation behavior to individual nodes.
-- Parser _yields_ Nodes
-- Schema determines Node Type
-- Types _check_ Nodes
 
 
 ### Parsing
@@ -693,67 +700,3 @@ $ ytt schema docs -f schema.yml | ytt -f- -f docs.html.txt
 - 🔒 [Cloud Foundry for Kubernetes Configuration and Versioning Scheme](https://docs.google.com/document/d/1q4QyaElEX3KtIeGjwPmZpxsJpgsxin9sx7M0T4qBiW0)
 - Sorbet (a typing system in Ruby): https://sorbet.org/docs/type-assertions
 - Kubernetes users requesting JSON Schema: https://github.com/kubernetes/kubernetes/issues/14987
-
-# Sketching
-
-`schema.yaml`
-```yaml=
-
-#@schema/match data_values=True
----
-#@schema/default []
-dns_servers:
-- hostname: ""
-  secure: false
-  map: 
-      a: ""
-```
-
-`values.yml`
-```yaml=
----
-dns_servers: []
-```
-
-
-`overlay.yml`
-```yaml=
-#@overlay/match by=...
----
-items:
-#@overlay/append       <== triggers Node typing
-- thing: one
-#@overlay/match by=overlay.all
-- other: true
-
-```
-
-
-`result.yml`
-```yaml=
-dns_servers:
-- hostname: ""
-  secure: false
-```
-
-`template.yml`
-```yaml=
----
-#@ for server in data.values.dns_servers:
-dns: #@ "{}:{}".format(server.secure, server.hostname)
-server.map.a
-#@ end
-```
-
-
-`overlay.yml`
-```yaml=
-#@overlay/match by=...
----
-items:
-#@overlay/append
-- thing: one
-  #@overlay/replace via=foo
-  other: 
-
-```
