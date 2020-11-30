@@ -5,8 +5,8 @@ tags: schema
 
 - Status: Scoping | **Pre-Alpha** | In Alpha | In Beta | GA | Rejected
 - Originating Issue: [ytt#103](https://github.com/k14s/ytt/issues/103)
+- Shared working copy: [![hackmd-github-sync-badge](https://hackmd.io/pODV3wzbT56MbQTxbQOOKQ/badge)](https://hackmd.io/pODV3wzbT56MbQTxbQOOKQ)
 
-[![hackmd-github-sync-badge](https://hackmd.io/pODV3wzbT56MbQTxbQOOKQ/badge)](https://hackmd.io/pODV3wzbT56MbQTxbQOOKQ)
 
 # Table of Contents
 
@@ -94,51 +94,26 @@ Configuration Authors establish a Schema by capturing the structure in a YAML do
 ### @schema/definition
 
 ```yaml
-#@schema/definition name="data/values", version="1.0.0", apply_by=pass
+#@schema/definition data_values=False
 ---
 #! Schema contents
 ```
-
-- `name=` sets an identifier for this schema that can be referenced later.
-  - the name `data/values` is reserved; it identifies the Data Values.
-  - if no name kwarg is given, "`data/values`" is assumed.
-- `version=` sets the version number of the schema, providing a means of orderly upgrades
-  (we strongly recommend using [Semantic Versioning 2.0](https://semver.org/) semantics). 
+- `data_values` (`bool`) — whether this schema is applicable to data values. If this
+  is not set to `True`, this results in an error.
 
 Notes:
-- Schema must be defined _before_ any other files containing YAML can be processed. Therefore, a file containing a Schema document must not contain other kinds of documents. 
+- Schema must be defined _before_ any other files containing YAML can be processed. Therefore, a file containing a Schema document must not contain other kinds of documents.
 - files containing Schema documents will be detected among input files (i.e. those specified by `-f`).
 - the first file containing a Schema document establishes the "base". Subsequent files containing Schema documents are overlayed onto the "base" in the order they appear (identically to how Data Values files are processed).
-- see [@schema/definition apply_by](schemadefinition_apply_by) for details on the use of this argument.
 
 ## Part 2: Applying Schema
 
-The Configuration Author can apply a specific schema on a YAML document:
+The Configuration Author can currently apply schema to Data Values.
 
-### @schema/apply
-
-```yaml
-#@schema/apply name="apps/v1/Deployment"
----
-#! plain YAML or YAML template contents (expected to contain a Deployment)
-```
-where:
-- `@schema/apply` requests that the Schema be applied to the annotated document.
-- `name` specifies which Schema to be applied to the document.
+_(Review [previous versions of this proposal](https://github.com/k14s/design-docs/commit/abd6dba2dc4bf9e46c0f352d2f2ae7bf17d08ac6#diff-1b42631f7965920fdf750e6ae57eb93df771f053b684d338dc89b5d0eb215bc1R114-R142) including [commentary as to why those ideas were deferred](https://github.com/k14s/design-docs/pull/1#discussion_r520717953) for ideas to more broadly apply schema)_
 
 
-### @schema/definition apply_by
-
-The Configuration Author can configure a Schema to automatically apply to Documents that satisfy the given matcher.
-
-```yaml
-#@schema/definition apply_by=overlay.subset()
----
-#! schema content for Deployment
-```
-where:
-- `apply_by` specifies the [Matcher function](https://github.com/k14s/ytt/blob/develop/docs/lang-ref-ytt-overlay.md#custom-overlay-matcher-functions) which selects Documents on which the Schema will be applied.
-
+**TODO:** elaborate on programmatic application of schema (e.g. to the contents of a ConfigMap)
 
 ## Part 3: Supported Types
 
@@ -336,7 +311,9 @@ Configuration Authors may override inferred typing and defaults through annotati
 
 Explicitly sets the type of the annotated node.
 
-`@schema/type one_of=typeA [, typeB[, ...]] [or_inferred=True] any=True`
+```yaml
+@schema/type one_of=typeA [, typeB[, ...]] [or_inferred=True] any=True
+```
 
 - `one_of` (`array of string`) — 
     - `typeX` (`string`) — the name of the type that the value of the annotated node must be.
@@ -376,7 +353,7 @@ __
 _Example 2: Nullable Collection_
 
 ```yaml
-#@schema/type one_of=["null"] or_inferred=True
+#@schema/type one_of="null" or_inferred=True
 aws:
   access_key: ""
   secret_key: ""
@@ -403,7 +380,9 @@ __
 
 Explicitly sets the default value of the annotated node.
 
-`@schema/default value`
+```yaml
+@schema/default value
+```
 
 - `value` (any except `function`) — the overriding default value.
 
@@ -465,7 +444,7 @@ __
 _Example 3: Explicitly nullable_
 
 ```yaml
-#@schema/type one_of=["null"], or_inferred=True
+#@schema/type one_of="null", or_inferred=True
 #@schema/default None
 aws:
   access_key: ""
@@ -478,11 +457,13 @@ where
 
 __
 
-#### @schema/nullable
+### @schema/nullable
 
 Extends the type of the node to include "null" _and_ to be "null" by default.
 
-`@schema/nullable`
+```yaml
+@schema/nullable
+```
 
 Notes:
 - Assumption: it is common for the Configuration Author to wish to specify that no matter the type, a value is both nullable and null, by default.
@@ -542,17 +523,14 @@ and in both cases, `cf_db` is defaulted to the inlined value (`username`, the st
 
 Defines criteria for values permitted for the key of the annotated node.
 
-`@schema/key [allowed=String|Function] [(expects=Int|String|List|Function | missing_ok=Bool)]`
+```
+@schema/key [allowed=String|Function] [(expects=Int|String|List|Function | missing_ok=Bool)]
+```
 
-- `allowed=String|Function(String,String):(bool,String)` — (optional) the predicate used to determine whether a supplied
+- `allowed=Regexp` — (optional) regular expression describing the 
   key name is valid.
   - if a `string` is given, it must be one of the following values:
       - `"any"` — no restriction: any value is valid.
-  - if is a `function`, it must take two arguments and return a `bool` or a `(bool, string)`.
-    - the arguments are the key in the target document and the key in the schema, respectively.
-    - if the return value is `True`, the key is permitted.
-    - if the return value is `False`, a violation results. if the return value includes a `string`,
-      that value is appended to the standard violation message.
   - if this argument is omited, the key specified in the document must match that in the schema.
 - `expects=Int|String|List|Function` — (optional) expected number of items to be `allowed`
   (and that are not matched by other schema).
@@ -651,6 +629,7 @@ connection_options:
     secret_key: ""
 ```
 
+
 ## Part 6: Documenting Schema
 
 Configuration Authors may document individual items in a Schema to clarify their meaning, purpose, and impact.
@@ -661,7 +640,9 @@ designed to ease configuration.
 
 Sets the user-friendly name or title of the node.
 
-`@schema/title title`
+```yaml
+@schema/title title
+```
 
 - `title` (`string`) — the short and human-readable name for the annotated node. This name should be suitable for 
   the name of a field in a UI or the "property name" column in a table in documentation (< ~20 characters)
@@ -684,7 +665,9 @@ __
 
 Sets the text describing the purpose of the node.
 
-`@schema/doc documentation`
+```yaml
+@schema/doc documentation
+```
 
 - `documentation` (`string`) — a more thorough description of the node or section that shares the context
   of the node, enumerates the range of possible values, explaining the effects of certain value ranges.
@@ -736,7 +719,9 @@ system_registry:
 
 Captures an exemplary value for the annotated node.
 
-`@schema/example sample_value`
+```yaml
+@schema/example sample_value
+```
 
 - `sample_value` (_type matching the node_) — a sample value that illustrates a common use. The value must be of the
   effective type of the node; to specify a value of another type is an error.
@@ -757,7 +742,9 @@ __
 
 Captures multiple exemplary values for the annotated node.
 
-`@schema/examples (exampleA_description, exampleA_value)[, (exampleB_description, exampleB_value)]`
+```yaml
+@schema/examples (exampleA_description, exampleA_value)[, (exampleB_description, exampleB_value)]
+```
 
 - `(exampleX_description, exampleX_value)` ([`tuple`](https://github.com/google/starlark-go/blob/master/doc/spec.md#tuples)) — 
   the example pair:
@@ -807,7 +794,9 @@ databases: []
 
 Marks a node as targeted for removal while still remaining defined and used.
 
-`@schema/deprecated notice`
+```yaml
+@schema/deprecated notice
+```
 
 - `notice` (`string`) — a message elaborating on the reason for the deprication, how to prepare for
   the removal (e.g. migrate to using a newly introduced value), and possibly a version-based timeline
@@ -830,7 +819,9 @@ __
 
 ### @schema/removed
 
-`@schema/removed remedy`
+```yaml
+@schema/removed remedy
+```
 
 - `remedy` (`string`) — a message providing next step instructions on how to repair the document/configuration.
 
@@ -854,7 +845,9 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
 
 ### @schema/validate
 
-`@schema/validate [...user-provided-funcs,] [...builtin-kwargs]`
+```yaml
+@schema/validate [...user-provided-funcs,] [...builtin-kwargs]
+```
 
   This annotation specifies how to validate value. `@schema/validate` will provide a set of keyword arguments which map to built-in validations, such as `max`, `max_len`, etc., but will also accept user-defined validation functions. Less common validators will also be provided via a `validations` library. For example,
 
@@ -904,40 +897,90 @@ Beyond specifying a type for a value, one can specify more dynamic constraints o
 
   String values, by default, have `@schema/validate min_len=1` validation added.
 
+#### Validation Documentation
+
+Configuration Consumers are more likely to provide valid values if they are aware
+of what defines valid.
+
+For this reason, validations should provide user-friendly documentation that makes
+this clear:
+- concise phrase that describes a valid value;
+- a short list of common example valid values;
+- citation to canonical definition.
+
+TBD.
+
+Sketch:
+- invoke the validation function with no arguments
+  - if it returns a `string` that is documentation (including the name)
+  - if it returns an error, discard and replace with default documentation (e.g. "Validation: "+str(validation_func))
+- first class `ytt` Schema functions can include this behavior
+- 3rd party functions can be wrapped in a function (or lambda expression) to decorate this behavior:
+    ```python
+    def is_valid_ip(val="__yttdoc__"):
+      if val != "__yttdoc__":
+        return thirdPartyLib.valid_ip(val)
+      else:
+        return "Valid IP: a well-formed IPv4 (RFC 2673, section 3.2) or IPv6 address (RFC 2373, section 2.2)."
+    end
+    ```
+
 ## Part 8: Interactions with Existing Features
 
 ### Changes to Data Values
 
-Prior to Schemas, Data Values protected against mistakes like typo'ed key names through the
-strict merge of additional data values documents: to successfully merge a new key, it must be marked
-as `@overlay/match missing_ok=True`.
+#### Data Value Overlays Become More Permissive
+
+Prior to Schemas, Data Values protected against mistakes like typo'ed key names through the strict merge of additional data values documents: to successfully merge a new key, it must be marked as `@overlay/match missing_ok=True`.
 
 The responsibility to ensure key names are valid are shifted from Data Values to Schema.
 
-When schema is present, Data Values documents imply an automatic merge of new keys. This is 
-equivalent to all `@data/values` documents being annotated with `@overlay/match-child-defaults missing_ok=True`.
+When schema is present, Data Values documents imply an automatic merge of new keys. This is equivalent to all `@data/values` documents being annotated with `@overlay/match-child-defaults missing_ok=True`. This behavior should not result in an error if a Data Values document _already_ is annotated
+this way.
+
+
+#### Omitted or Empty Data Values
+
+When Data Values are omitted, the effective Data Values will be the defaults as defined by the schema. If all defaults specified in Schema are valid values (consider especially that `string`s imply a `@schema/validation min_len=1`), the Configuration Consumer should not
+need to supply any Data Values.
+
+
+#### Violations in First Data Value
+
+When one or more schema violation(s) occur in the first Data Values file, `ytt` should:
+1. report the violation(s); and
+2. stop processing.
+
+
+### Overlays
+
+Schema aims to provide the earliest possible and actionable feedback so that Configuration Consumers can successfully complete their task in the shortest possible duration.
+
+When one or more schema violation(s) occur after a Data Value overlay operation, `ytt` should:
+1. display the current state of the document (since this version of document appears nowhere);
+2. report the violation(s); and
+3. stop processing.
+
 
 ### Overlays of Schema
 
 TBD
 
 - It must be possible to extend Schema (i.e. add new items)
-- Is it necessary to be able to modify Schema?
-
+- When do Configuration Consumers need to modify Schema?
+    - they add templates that require additional data values
+    - soften or remove overzealous validations
+    - when overlays on templates change the type of the expected data values
 
 ## Open Questions
 
-- It is not uncommon for a validation to want to refer to a sibling node.
-    - right now, the Configuration Author places these on the parent node.
-    - that puts separation between the node being constrained and its constraint.
-    - is there a feasible way for a validation rule to get access to its siblings?
+- Overlaying Schema implies the need for meta to be copied along 
 - Documentation could be enhanced if validation rules were included. How could validation authors
   provide documentation for their validation?
   - provide a magic string for the input and the function returns documentation?
   - function always returns documentation as part of return value?
 - How should schema work with ytt libraries?
   - How do we support data values that are targetting a dependency library?
-- Are there needs around versioning schema?
 - How will code defined in a schema file make its way into the execution context of the target "template"?
   - e.g. function supporting validation
   - idea: could we capture the "globals" resulting from the execution of the schema "template" and feed those into the target "template"'s execution context?
@@ -948,10 +991,16 @@ TBD
 - respect schema for data values set via cmd line flags/env vars
 - add --data-values-schema-inspect (similar to --data-values-inspect)
   - generate html view via builtin server
-- with the addition of a schema, the first data values file no longer serves that role. Could we improve the UX of adding multiple data value files by not requiring subsequent data values to be overlays?
-- could a user include both a data/value + schema/amend in the same file?
-  - allowing a user to define and include input values in one file?
-
+- a component team introduces breaking change… how do we discover that happened? (is that a use case that's in scope for ytt?)
+- schema diff
+    - as a Configuration Consumer, what drives me asking for a diff? what am I looking for?
+    - what do we get from YAML diffing tools?
+    - what is the gap between the need and what we get with diffing tools?
+- using extensions for ytt types.
+  - https://github.com/k14s/ytt/issues/51
+- @schema/key allowed= <== does this justify the power it affords? will we regret it?
+  - string or list of strings, at first?
+- 
 
 
 # Sample Usage
@@ -1022,9 +1071,7 @@ Sources:
 #@ end
 
 ---
-#@ def relabelings():
-#@schema/validate replace_has_target_label, non_hashmod_has_regex
-- 
+#@ def relabeling():
   #@schema/title "Source labels"
   #@ doc = '''
   #@   The source labels select values from existing labels. Their content is concatenated
@@ -1065,7 +1112,12 @@ Sources:
   #@schema/validate enum=["replace", "keep", "drop", "hashmod", "labelmap", "labeldrop", "labelkeep"]
   action: replace
 #@ end
-  
+
+#@ def relabelings():
+#@schema/validate replace_has_target_label, non_hashmod_has_regex
+- #@ relabeling()
+#@ end
+
 #! metrics_path is required to match upstream rules and charts
 #@ def metrics_path_relabel():
 sourceLabels: [__metrics_path__]
@@ -1645,3 +1697,11 @@ $ ytt schema docs -f schema.yml | ytt -f- -f docs.html.txt
 - Sorbet (a typing system in Ruby): https://sorbet.org/docs/type-assertions
 - Kubernetes users requesting JSON Schema: https://github.com/kubernetes/kubernetes/issues/14987
 - JSON Schema Validation: https://json-schema.org/draft/2019-09/json-schema-validation.html
+
+# Closed Questions
+
+- _Is there a feasible way for a validation rule to get access to its siblings?_ **not now.** [details](https://github.com/k14s/design-docs/pull/1#discussion_r521425869) 
+- _Are there needs around versioning schema?_ **Not for the foreseable future.** [details](https://github.com/k14s/design-docs/pull/1#discussion_r521426706)
+- _With the addition of a schema, the first data values file no longer serves that role. Could we improve the UX of adding multiple data value files by not requiring subsequent data values to be overlays?_ **Yes, which should be covered in [Part 8: Interactions with Existing Features](#Part-8-Interactions-with-Existing-Features).
+- _Could a user include both a data/value + schema/amend in the same file?_ **For now, no.... but maybe** [details](https://github.com/k14s/design-docs/pull/1#discussion_r521433218)
+
