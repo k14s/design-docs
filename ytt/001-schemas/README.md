@@ -524,14 +524,11 @@ and in both cases, `cf_db` is defaulted to the inlined value (`username`, the st
 Defines criteria for values permitted for the key of the annotated node.
 
 ```
-@schema/key [allowed=String|Function] [(expects=Int|String|List|Function | missing_ok=Bool)]
+@schema/key [allowed=Regexp] [(expects=Int|String|List|Function | missing_ok=Bool)]
 ```
 
-- `allowed=Regexp` — (optional) regular expression describing the 
-  key name is valid.
-  - if a `string` is given, it must be one of the following values:
-      - `"any"` — no restriction: any value is valid.
-  - if this argument is omited, the key specified in the document must match that in the schema.
+- `allowed=Regexp` — (optional) regular expression declaring the required format of the key.
+  - if this argument is omitted, the key specified in the document must match that in the schema.
 - `expects=Int|String|List|Function` — (optional) expected number of items to be `allowed`
   (and that are not matched by other schema).
    - `Int` — must match this number, exactly
@@ -545,10 +542,8 @@ Defines criteria for values permitted for the key of the annotated node.
 Notes:
 - this annotation is only applicable to map items. If it is specified on any other kind of node,
   it is an error.
-- if a map item satisfies more than one `@schema/key allowed`, an error results. This is to
-  avoid unintended interactions of multiple wildcard-like rules.
-- additional string-based values for `allowed` may be discovered and included as short-hand for
-  commonly-used predicates.
+- only target map items that have not matched with prior schema map items are subject to matching
+  via `allowed`. That is, map item matching occurs in the order that they appear in the schema.
 - the re-use of `expects` from Overlays is deliberate: in both cases, the parameter captures
   how many of a given item are expected.
 
@@ -924,10 +919,77 @@ Sketch:
         return "Valid IP: a well-formed IPv4 (RFC 2673, section 3.2) or IPv6 address (RFC 2373, section 2.2)."
     end
     ```
+    
+## Part 8: Command-Line Interface Interactions
 
-## Part 8: Interactions with Existing Features
+:::warning
+There is active User Research into how to more effectively communicate with `ytt` users. Findings from that research
+should trump whatever "requirements" are specified below.
+:::
+
+Schema violation messages should be:
+- readable — easy/quick to determine the nature and details of the violation.
+- actionable — clear what step would need to be taken to fix the violation.
+- complete — no other context is required to fix the violation.
+- supportive — informs, without blame.
+
+To get there, consider these principles:
+- convey concisely — the fewer words written, the more words read.
+- be consistent — use the same word for the same concept; the same layout for the same kind of message.
+- prioritize position of information — place more important information in a more prominent spot.
+- be empathetic — use words the user must already know; when you cannot, define it or point to a definition.
+
+### Type Violations
+
+When a value given is malformed (wrong structure/type) `ytt` will report these violations and stop processing.
+
+Type violations can come from:
+- an incorrectly formed explicit default value (i.e. the value of `@schema/default`)
+- a data value (noted below: all `@data/values` documents are implied overlays)
+
+`schema.yml`
+```yaml=
+#@schema/definition name="data/values"
+---
+system_domain: ""
+
+load_balancer:
+  enabled: true
+  external_ip: ""
+```
+
+`values.yml`
+```yaml=
+#@data/values
+---
+system_domain: false
+
+load_balancer: true
+```
+
+
+```
+$ ytt -f schema.yml -f values.yml
+ytt: Error: ...
+
+Result of values.yml did not pass "data/values" schema:
+
+values.yml:3 | system_domain:
+             |     ^^^ found: boolean
+             |         expected: string (by schema.yml:3)
+```
+
+**Note:**
+- the document at `values.yml:2` implies `@overlay/match by=overlay.all` and `@overlay/match-child-defaults missing_ok=True`
+- `values.yml` has two overlay operations: merge of `system_domain` and merge of `load_balancer`.
+- there are, in fact, two type violations. However, `ytt` stops after the first
+
+### Validation Violations
+
+## Part 9: Interactions with Existing Features
 
 ### Changes to Data Values
+
 
 #### Data Value Overlays Become More Permissive
 
@@ -935,21 +997,18 @@ Prior to Schemas, Data Values protected against mistakes like typo'ed key names 
 
 The responsibility to ensure key names are valid are shifted from Data Values to Schema.
 
-When schema is present, Data Values documents imply an automatic merge of new keys. This is equivalent to all `@data/values` documents being annotated with `@overlay/match-child-defaults missing_ok=True`. This behavior should not result in an error if a Data Values document _already_ is annotated
-this way.
+When schema is present, Data Values documents imply an automatic merge of new keys. This is equivalent to all `@data/values` documents being annotated with `@overlay/match-child-defaults missing_ok=True`.
+
+This behavior should not result in an error if a Data Values document _already_ is annotated this way.
 
 
-#### Omitted or Empty Data Values
+#### All Data Values Become Overlays
 
-When Data Values are omitted, the effective Data Values will be the defaults as defined by the schema. If all defaults specified in Schema are valid values (consider especially that `string`s imply a `@schema/validation min_len=1`), the Configuration Consumer should not
-need to supply any Data Values.
+Before Schema, the first YAML document annotated with `@data/values` effectively defined both an implied schema and defaults.
 
+With Schema, the base data values document is produced by collecting all the net default values from the schema, itself.
 
-#### Violations in First Data Value
-
-When one or more schema violation(s) occur in the first Data Values file, `ytt` should:
-1. report the violation(s); and
-2. stop processing.
+`ytt` will automatically convert _all_ data values into overlays.
 
 
 ### Overlays
@@ -957,7 +1016,7 @@ When one or more schema violation(s) occur in the first Data Values file, `ytt` 
 Schema aims to provide the earliest possible and actionable feedback so that Configuration Consumers can successfully complete their task in the shortest possible duration.
 
 When one or more schema violation(s) occur after a Data Value overlay operation, `ytt` should:
-1. display the current state of the document (since this version of document appears nowhere);
+1. display the current state of the violating portion of the document; (it's quite possible, this data does not appear anywhere else)
 2. report the violation(s); and
 3. stop processing.
 
