@@ -919,6 +919,18 @@ Sketch:
         return "Valid IP: a well-formed IPv4 (RFC 2673, section 3.2) or IPv6 address (RFC 2373, section 2.2)."
     end
     ```
+
+**Implementation considerations:**
+
+
+As part of the implementation of the validation feature we should use some of the knowledge from the Type Checking
+implemented before.
+- Isolation of packages like yamlmeta from external dependencies
+
+    This package is intended as a place for the yaml internal structures
+- Eventually it make sense to implement the validation near the Schemas and also move the Type Check to the same package
+
+    When implementing we should consider to create a walker that iterate over the YAML document to do the Check or the Validation depending on the action we want to perform in a given moment
     
 ## Part 8: Command-Line Interface Interactions
 
@@ -963,10 +975,8 @@ load_balancer:
 #@data/values
 ---
 system_domain: false
-
 load_balancer: true
 ```
-
 
 ```
 $ ytt -f schema.yml -f values.yml
@@ -982,7 +992,7 @@ values.yml:3 | system_domain:
 **Note:**
 - the document at `values.yml:2` implies `@overlay/match by=overlay.all` and `@overlay/match-child-defaults missing_ok=True`
 - `values.yml` has two overlay operations: merge of `system_domain` and merge of `load_balancer`.
-- there are, in fact, two type violations. However, `ytt` stops after the first
+- there are, in fact, two type violations. However, `ytt` stops after the first overlay operation fails.
 
 ### Validation Violations
 
@@ -1033,13 +1043,18 @@ TBD
 
 ## Open Questions
 
+- Given that Data Values all become overlays, now all array items require a `@overlay/append`
+    - this will be a negative UX for brand new users as it lights a number of tool features just so that I can specify an array for my library. :(
+    - this has been a pain 
+- How could we assign line numbers to YAML nodes that are generated from Starlark code? 
+    - how common of a situation is this?
+    - becomes more important when referencing nodes in schema because our violation messages depend on naming the type/structure declaration by line number.
 - Overlaying Schema implies the need for meta to be copied along 
-- Documentation could be enhanced if validation rules were included. How could validation authors
-  provide documentation for their validation?
+- Documentation could be enhanced if validation rules were included. How could validation authors provide documentation for their validation?
   - provide a magic string for the input and the function returns documentation?
   - function always returns documentation as part of return value?
 - How should schema work with ytt libraries?
-  - How do we support data values that are targetting a dependency library?
+  - How do we support data values that are targeting a dependency library?
 - How will code defined in a schema file make its way into the execution context of the target "template"?
   - e.g. function supporting validation
   - idea: could we capture the "globals" resulting from the execution of the schema "template" and feed those into the target "template"'s execution context?
@@ -1049,7 +1064,6 @@ TBD
 - provide programmatic schema.apply() (similar to overlay.apply)
 - respect schema for data values set via cmd line flags/env vars
 - add --data-values-schema-inspect (similar to --data-values-inspect)
-  - generate html view via builtin server
 - a component team introduces breaking change… how do we discover that happened? (is that a use case that's in scope for ytt?)
 - schema diff
     - as a Configuration Consumer, what drives me asking for a diff? what am I looking for?
@@ -1057,9 +1071,6 @@ TBD
     - what is the gap between the need and what we get with diffing tools?
 - using extensions for ytt types.
   - https://github.com/k14s/ytt/issues/51
-- @schema/key allowed= <== does this justify the power it affords? will we regret it?
-  - string or list of strings, at first?
-- 
 
 
 # Sample Usage
@@ -1692,61 +1703,114 @@ _([graphviz reference](https://www.tonyballantyne.com/graphs.html))_
 
 ### Schema Documentation
 
-
-#### Workflow Sketch
-
-:::warning
-Not how it _must_ be, but how it _could_ be.
-:::
-
+- users generate documentation through the `--schema-inspect` flag (this mirrors other `--...-inspect` flags that also produce information).
+- this can be rendered in HTML when user couples this with `--output html`
 
 `schema.yml`
 ```yaml=
-#@schema/title "User Name used to log into the database."
-username: ""
 
-#@schema/title "Full URL to the external database."
-#@schema/doc "Only used if `enable_external_db` is `true`"
-db_url: ""
-```
+#@schema/title "Application Domains"
+#@schema/doc "List of DNS domains used for deployed applications."
+#@schema/example [“apps.cf.example.com”]
+app_domains:
+  - ""
+  
+uaa:
+  #@schema/title "UAA Login Secret"
+  #@schema/doc "Secret for an external login server to authenticate to UAA"
+  login_secret: ""
+  login:
+    service_provider:
+      #@schema/title "UAA Service Provider Certificate"
+      #@schema/doc "X.509 Certificate for UAA's SAML provider"
+      certificate: ""
+      #@schema/title "UAA Service Provider Private Key"
+      #@schema/doc "Private key paired with the X.509 Certificate for UAA's SAML provider"
+      key: ""
+  
 
-`schema-docs.yml`
-```yaml=
-docs:
+app_registry:
+  hostname:
   username:
-    title: User Name used to log into the database.
-  db_url:
-    title: Full URL to the external database.
-    doc: Only used if `enable_external_db` is `true`
+  password:
+  
+
 ```
 
-`schema-docs.yml`
-```yaml=
-#@data/values
----
-docs:
+```shell
+$ ytt -f schema.yml --schema-inspect
+schema:
+  name: "data/values"
   fields:
-  - name: "username"
-    title: User Name used to log into the database.
-  - name: "db_url"
+  - name: username
+    title: Database username
+    documentation: The account in the database system to authenticate as.
+    example:
+    - value: admin
+      description: null
+  - name: db_url
     title: Full URL to the external database.
-    doc: Only used if `enable_external_db` is `true`
+```
+
+```shell
+$ ytt -f schema.yml --schema-inspect --output html
+<div class="data-values-title">Schema for "data/values"</div>
+<table class="data-values-fields">
+<thead>
+  <tr>
+    <th><th>Name</th><th>Description</th><th>Details</th><th>Example</th>
+  </tr>
+</thead>
+<tbody>
+<tr>
+<td class="fieldname">username</td>
+<td class="title">Database username</td>
+<td class="documentation"></td>
+<td class="example"></td>
+</tr>
+<tr>
+<td class="fieldname"></td>
+<td class="title"></td>
+<td class="documentation"></td>
+<td class="example"></td>
+</tr>
+</tbody>
+
+  <tr class="datavalue">
+    <td class="fieldname">username</td>
+    <td class="title">User Name used to log into the database.</td>
+    <td class="documentation">
+      The account in the database system to authenticate as.
+      <p class="example">
+        Example: <span class="example"></span>
+        <pre class="examplevalue">
+          admin
+        </pre>
+      </p>
+    </td>
+  </tr>
+  (@ end -@)
+</table>
+
+  fields:
+  - name: username
+    title: 
+    example:
+    - value: admin
+      description: null
+  - name: db_url
+    title: Full URL to the external database.
 ```
 
 `docs.html.txt`
 ```htmlmixed=
 (@ load("@ytt:data", "data") @)
 
-<table>
-  <th><td>Field</td><td>Title</td><td>Description</td></th>
-  (@ for field in data.values.docs.fields: @)<tr><td>(@= field.name @)</td><td>(@= field.title@)</td></tr>
-  (@ end -@)
-</table>
 
 ```
 
 ```shell
-$ ytt schema docs -f schema.yml | ytt -f- -f docs.html.txt
+$ ytt --schema-inspect -f schema.yml --output html
 ```
 
 
