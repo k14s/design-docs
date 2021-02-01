@@ -93,7 +93,7 @@ Warning: .bundles folder could not be added to the bundle.
 
 ### Example
 
-Assuming the provided example in [here](https://github.com/k14s/design-docs/imgpkg/002-recursive-bundles/examples)
+Assuming the provided example in [here](https://github.com/k14s/design-docs/tree/002-recursive-bundles/imgpkg/002-recursive-bundles/examples)
 
 ```=
 $ imgpkg push -b ghcr.io/k14s/design-docs/simple-app-bundle -f examples/bundle-1
@@ -277,4 +277,29 @@ The bundle repo (ghcr.io/k14s/design-docs/simple-app-install-package) is hosting
 
 Updating all images in the ImagesLock file: pull-tmp/.imgpkg/images.yml
 + Changing all image registry/repository references in pull-tmp/.imgpkg/images.yml to ghcr.io/k14s/design-docs/simple-app-install-package
+```
+
+
+## List Images in Bundle
+
+*This feature is a nice to have*
+
+Enable the users of `imgpkg` to understand, without pulling the bundle, what images are part of the bundle.
+
+### Proposed change
+
+Create a new command that could provide the user with information about the contents of a bundle
+
+```=
+$ imgpkg info -b ghcr.io/k14s/design-docs/simple-app-install-package
+
+Images:
+  - ghcr.io/k14s/design-docs/simple-app-install-package@sha256:d211dd700949154e429d28661d01c99d53a38af0d5275842ccbf0bf6dbef8ca4 (Bundle)
+    Images:
+      - ghcr.io/k14s/design-docs/simple-app-install-package@sha256:4c8b96d4fffdfae29258d94a22ae4ad1fe36139d47288b8960d9958d1e63a9d0
+        Annotations:
+          kbld.carvel.dev/id: my.registry.io/simple-application
+
+      - ghcr.io/k14s/design-docs/simple-app-install-package@sha256:47ae428a887c41ba0aedf87d560eb305a8aa522ffb80ac1c96a37b16df038e0f
+  - ghcr.io/k14s/design-docs/simple-app-install-package@sha256:47ae428a887c41ba0aedf87d560eb305a8aa522ffb80ac1c96a37b16df038e0f
 ```
