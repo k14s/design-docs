@@ -212,7 +212,9 @@ Succeeded
 
 #### Change folder structure
 
-When downloading a bundle that contains other bundles to disk using the `pull` command will work as currently, except for that it will download the nested bundles into a hidden folder called `.bundles`.
+When using the `pull` command without the `-r` flag the behavior is not changed. Nothing will be dowloaded from the nested bundles.
+
+When downloading a bundle that contains other bundles to disk using the `pull -r` command will work as currently, except for that it will download the nested bundles into a hidden folder called `.bundles`.
 
 ##### Folder structure
 
@@ -248,13 +250,13 @@ To ensure that there is not cyclic nesting in the disk `imgpkg` will flatten the
 In the image above Bundle 1, Bundle 2 and, Bundle 3 will be all in a single level inside the `.bundles` folder.
 
 
-### Example
+### Example with -r
 
 Given that we create a bundle using the command 
-`imgpkg push -b ghcr.io/k14s/design-docs/simple-app-install-package -f imgpkg/002-recursive-bundles/examples/recursive-bundle`
+`imgpkg push -r -b ghcr.io/k14s/design-docs/simple-app-install-package -f imgpkg/002-recursive-bundles/examples/recursive-bundle`
 
 ```=
-$ imgpkg pull -b ghcr.io/k14s/design-docs/simple-app-install-package -o /tmp/recursive-bundle
+$ imgpkg pull -r -b ghcr.io/k14s/design-docs/simple-app-install-package -o /tmp/recursive-bundle
 
 Pulling bundle 'ghcr.io/k14s/design-docs/simple-app-install-package@sha256:77c97e82306fb2a616da0a78796db039aa76e5bac1508954d40c0c10c073e035'
 Bundle Layers
@@ -278,6 +280,28 @@ Updating all images in the ImagesLock file: pull-tmp/.imgpkg/images.yml
 + Changing all image registry/repository references in pull-tmp/.imgpkg/images.yml to ghcr.io/k14s/design-docs/simple-app-install-package
 ```
 
+### Example without -r
+
+Given that we create a bundle using the command 
+`imgpkg push -b ghcr.io/k14s/design-docs/simple-app-install-package -f imgpkg/002-recursive-bundles/examples/recursive-bundle`
+
+```=
+$ imgpkg pull -b ghcr.io/k14s/design-docs/simple-app-install-package -o /tmp/recursive-bundle
+
+Pulling bundle 'ghcr.io/k14s/design-docs/simple-app-install-package@sha256:77c97e82306fb2a616da0a78796db039aa76e5bac1508954d40c0c10c073e035'
+Bundle Layers
+  Extracting layer 'sha256:87bf2c587b3315143cd05df7bd24d4e608ddb59f8c62110fe1b579fb817a2917' (1/1)
+  
+Nested bundles
+  Bundle 'ghcr.io/k14s/design-docs/simple-app-install-package@sha256:d211dd700949154e429d28661d01c99d53a38af0d5275842ccbf0bf6dbef8ca4' (1/2)
+  Bundle 'ghcr.io/k14s/design-docs/simple-app-install-package@sha256:47ae428a887c41ba0aedf87d560eb305a8aa522ffb80ac1c96a37b16df038e0f' (2/2)
+
+Locating image lock file images...
+The bundle repo (ghcr.io/k14s/design-docs/simple-app-install-package) is hosting every image specified in the bundle's Images Lock file (.imgpkg/images.yml)
+
+Updating all images in the ImagesLock file: pull-tmp/.imgpkg/images.yml
++ Changing all image registry/repository references in pull-tmp/.imgpkg/images.yml to ghcr.io/k14s/design-docs/simple-app-install-package
+```
 
 ## List Images in Bundle
 
