@@ -87,8 +87,7 @@ As part of this proposal, we should ensure that if a user tries to create a bund
 `imgpkg` should ignore the folder and provide the following message
 
 ```
-Warning: .bundles folder could not be added to the bundle.
-         This folder is used to store configurations of recursive bundles and cannot be checked into the bundle
+Warning: Ignoring ".bundles" directory (directory is only used for keeping pulled dependent bundles)
 ```
 
 ### Example
