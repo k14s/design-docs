@@ -22,6 +22,13 @@ tags: recursive bundles, imgpkg
 
 **So that** Application consumers can retrieve all needed software from a single place
 
+### Goals
+- Create a UX that is suitable to be used by other higher level applications
+- Create a solution that could be scalable
+
+### Anti Goals
+- Be prescriptive about the implementation details
+
 
 ### Current Pain Points
 
@@ -248,6 +255,8 @@ The folder name will be the sha256-{SHA} where SHA is the SHA256 of the bundle O
 To ensure that there is not cyclic nesting in the disk `imgpkg` will flatten the bundle structure to 1 level.
 ![](https://i.imgur.com/zSlnzg7.png)
 In the image above Bundle 1, Bundle 2 and, Bundle 3 will be all in a single level inside the `.bundles` folder.
+
+**Caveat:** As per our goals on this document, this proposal tries to cater to the UX experience for other applications to use the output of the `pull` command. In this iteration, it might be a little bit more complicated for a human to easily follow the structure, but in the future, there might so other features or tooling that could help humans better visualize the bundle contents.
 
 
 ### Example with -r
