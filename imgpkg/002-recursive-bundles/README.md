@@ -3,7 +3,7 @@ tags: recursive bundles, imgpkg
 ---
 # imgpkg Recursive Bundles Proposal
 
-- Proposal Status: **Draft**, In Review, Accepted, Rejected
+- Proposal Status: Draft, **In Review**, Accepted, Rejected
 
 
 # Table of Contents
