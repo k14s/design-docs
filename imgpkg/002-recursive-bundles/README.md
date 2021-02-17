@@ -89,12 +89,12 @@ As part of this proposal, this check no longer will be done.
 
 #### Ignore bundle specific folder
 
-When a bundle is pulled, and contain recursive bundles, the folder `.bundles` is created in the root of the bundle.
+When a bundle is pulled, and contain recursive bundles, the folder `.bundles` is created inside the `.imgpkg/` folder.
 As part of this proposal, we should ensure that if a user tries to create a bundle and it contains a folder called `.bundles`
 `imgpkg` should ignore the folder and provide the following message
 
 ```
-Warning: Ignoring ".bundles" directory (directory is only used for keeping pulled dependent bundles)
+Warning: Ignoring ".imgpkg/.bundles" directory (directory is only used for keeping pulled dependent bundles)
 ```
 
 ### Example
@@ -221,7 +221,7 @@ Succeeded
 
 When using the `pull` command without the `-r` flag the behavior is not changed. Nothing will be dowloaded from the nested bundles.
 
-When downloading a bundle that contains other bundles to disk using the `pull -r` command will work as currently, except for that it will download the nested bundles into a hidden folder called `.bundles`.
+When downloading a bundle that contains other bundles to disk using the `pull -r` command will work as currently, except for that it will download the nested bundles into a hidden folder called `.imgpkg/.bundles`.
 
 ##### Folder structure
 
@@ -229,18 +229,18 @@ The structure of the output folder will be
 ```
 $ tree -a recursive-bundle
 .
-├── .bundles
-│   ├── sha256-{SHA Of the First Nested Bundle}
-│   │   ├── .imgpkg
-│   │   │   ├── bundle.yml
-│   │   │   └── images.yml
-│   │   └── config2.yml
-│   └── sha256-{SHA Of the Second Nested Bundle}
-│   │   ├── .imgpkg
-│   │   │   ├── bundle.yml
-│   │   │   └── images.yml
-│       └── config1.yml
 ├── .imgpkg
+|   ├── .bundles
+|   │   ├── sha256-{SHA Of the First Nested Bundle}
+|   │   │   ├── .imgpkg
+|   │   │   │   ├── bundle.yml
+|   │   │   │   └── images.yml
+|   │   │   └── config2.yml
+|   │   └── sha256-{SHA Of the Second Nested Bundle}
+|   │       ├── .imgpkg
+|   │       │   ├── bundle.yml
+|   │       │   └── images.yml
+|   │       └── config1.yml
 │   ├── bundle.yml
 │   └── images.yml
 └── config.yml
@@ -249,6 +249,8 @@ $ tree -a recursive-bundle
 ```
 
 The folder name will be the sha256-{SHA} where SHA is the SHA256 of the bundle OCI Image. The mapping between the folder names and the origin images can be found in the `.imgpkg/images.yml` of the bundle that included this bundle
+
+The decision to have this folder inside the `.imgpkg` folder was taken to minimize the footprint that `imgpkg` leaves in the file system.
 
 ###### Cyclic nesting
 
