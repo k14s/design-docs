@@ -89,12 +89,12 @@ As part of this proposal, this check no longer will be done.
 
 #### Ignore bundle specific folder
 
-When a bundle is pulled, and contain recursive bundles, the folder `.bundles` is created inside the `.imgpkg/` folder.
-As part of this proposal, we should ensure that if a user tries to create a bundle and it contains a folder called `.bundles`
+When a bundle is pulled, and contain recursive bundles, the folder `bundles` is created inside the `.imgpkg/` folder.
+As part of this proposal, we should ensure that if a user tries to create a bundle and it contains a folder called `.imgpkg/bundles`
 `imgpkg` should ignore the folder and provide the following message
 
 ```
-Warning: Ignoring ".imgpkg/.bundles" directory (directory is only used for keeping pulled dependent bundles)
+Warning: Ignoring ".imgpkg/bundles" directory (directory is only used for keeping pulled dependent bundles)
 ```
 
 ### Example
@@ -221,7 +221,7 @@ Succeeded
 
 When using the `pull` command without the `-r` flag the behavior is not changed. Nothing will be dowloaded from the nested bundles.
 
-When downloading a bundle that contains other bundles to disk using the `pull -r` command will work as currently, except for that it will download the nested bundles into a hidden folder called `.imgpkg/.bundles`.
+When downloading a bundle that contains other bundles to disk using the `pull -r` command will work as currently, except for that it will download the nested bundles into a hidden folder called `.imgpkg/bundles`.
 
 ##### Folder structure
 
@@ -230,7 +230,7 @@ The structure of the output folder will be
 $ tree -a recursive-bundle
 .
 ├── .imgpkg
-|   ├── .bundles
+|   ├── bundles
 |   │   ├── sha256-{SHA Of the First Nested Bundle}
 |   │   │   ├── .imgpkg
 |   │   │   │   ├── bundle.yml
@@ -256,7 +256,7 @@ The decision to have this folder inside the `.imgpkg` folder was taken to minimi
 
 To ensure that there is not cyclic nesting in the disk `imgpkg` will flatten the bundle structure to 1 level.
 ![](https://i.imgur.com/zSlnzg7.png)
-In the image above Bundle 1, Bundle 2 and, Bundle 3 will be all in a single level inside the `.bundles` folder.
+In the image above Bundle 1, Bundle 2 and, Bundle 3 will be all in a single level inside the `bundles` folder.
 
 **Caveat:** As per our goals on this document, this proposal tries to cater to the UX experience for other applications to use the output of the `pull` command. In this iteration, it might be a little bit more complicated for a human to easily follow the structure, but in the future, there might so other features or tooling that could help humans better visualize the bundle contents.
 
