@@ -1,6 +1,8 @@
 ---
 tags: recursive bundles, imgpkg
 ---
+
+⚠️ This proposal has ben moved to https://github.com/vmware-tanzu/carvel-community/tree/develop/proposals/imgpkg/002-recursive-bundles
 # imgpkg Recursive Bundles Proposal
 
 - Proposal Status: Draft, **In Review**, Accepted, Rejected
