@@ -1,3 +1,5 @@
+⚠️ This proposal has ben moved to https://github.com/vmware-tanzu/carvel-community/tree/develop/proposals/imgpkg/001-bundles
+
 # Bundles
 
 - Status: Being written | **Being implemented** | Included in release | Rejected
