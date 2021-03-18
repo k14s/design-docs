@@ -1,6 +1,8 @@
 ---
 tags: schema
 ---
+
+⚠️ This proposal has ben moved to https://github.com/vmware-tanzu/carvel-community/tree/develop/proposals/ytt
 # Schemas
 
 - Status: Scoping | **Pre-Alpha** | In Alpha | In Beta | GA | Rejected
